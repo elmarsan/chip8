@@ -1,47 +1,21 @@
 #include "Chip8.h"
+#include "Logger.h"
+
 #include <cstdio>
-#include <vector>
 #include <cstdlib>
-#include <chrono>
-#include <thread>
 
-#define MEMORY_SIZE 4096
-#define ROM_START_ADDRESS 0x200
-#define FONT_SET_SIZE 80
-#define FONT_SIZE 5
-#define FONT_SET_START_ADDRESS 0x50
-#define REGISTERS 16
-#define GFX_WIDTH 64
-#define GFX_HEIGHT 32
-
-uint8_t fontSet[FONT_SET_SIZE] = {
-        0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
-        0x20, 0x60, 0x20, 0x20, 0x70, // 1
-        0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
-        0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
-        0x90, 0x90, 0xF0, 0x10, 0x10, // 4
-        0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
-        0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
-        0xF0, 0x10, 0x20, 0x40, 0x40, // 7
-        0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
-        0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
-        0xF0, 0x90, 0xF0, 0x90, 0x90, // A
-        0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
-        0xF0, 0x80, 0x80, 0x80, 0xF0, // C
-        0xE0, 0x90, 0x90, 0x90, 0xE0, // D
-        0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
-        0xF0, 0x80, 0xF0, 0x80, 0x80  // F
+const uint32_t colors [4]{
+    0xFF000000, // red
+    0x00FF0000, // green
+    0x0000FF00, // blue
+    0xFFBF0000, // orange
 };
 
-Chip8::Chip8() {
-    pc = ROM_START_ADDRESS;
-    memory = std::vector<uint8_t>(MEMORY_SIZE);
-    V = std::vector<uint8_t>(REGISTERS);
-    I = 0x00;
-    DT = 0x00;
-    ST = 0x00;
+Chip8::Chip8(Keyboard *k) : keyboard(k) {
+    std::srand(std::time(nullptr));
 
-    lastTime = std::chrono::high_resolution_clock::now();
+    pc = MEMORY_ROM_START_ADDRESS;
+    palette = colors[std::rand() % 4];
 
     // Load font set in memory
     for (uint8_t i = 0; i < FONT_SET_SIZE; ++i) {
@@ -49,39 +23,33 @@ Chip8::Chip8() {
     }
 }
 
-void Chip8::stepTimers() {
-    if (DT > 0) DT--;
-}
-
-void Chip8::loadProgram(const char *buffer, int size) {
+void Chip8::LoadRom(const char *buffer, int size) {
     for (int i = 0; i < size; ++i) {
-        const auto opcode = uint8_t (buffer[i]);
-        memory[ROM_START_ADDRESS + i] = opcode;
+        const auto opcode = uint8_t(buffer[i]);
+        memory[MEMORY_ROM_START_ADDRESS + i] = opcode;
     }
 }
 
-void Chip8::execute() {
+void Chip8::ExecuteCycle() {
     const uint8_t p1 = memory[pc];
     const uint8_t p2 = memory[pc + 1];
     const uint8_t prefix = (p1 & 0XF0) >> 4;
-    uint16_t opcode =  (p1 << 8) | p2;
+    uint16_t opcode = (p1 << 8) | p2;
 
-    printf("RAM [ 0x%04x ] opcode [ 0x%04x ]\n", pc, opcode);
+    LDEBUG("RAM[0x%04x] 0x%04x \n", pc, opcode);
 
     switch (prefix) {
         case 0x0: {
             // Clear the display
             if (opcode == 0X00E0) {
-                clearDisplay();
+                ClearGfx();
                 pc += 2;
-//                printf("Clear display");
             }
 
-            // Return from a subroutine
+            // Return from subroutine
             if (opcode == 0x00EE) {
                 pc = stack.top();
                 stack.pop();
-//                printf("Return from a subroutine");
             }
 
             break;
@@ -91,7 +59,6 @@ void Chip8::execute() {
         case 0x1: {
             uint16_t add = (opcode & 0X0FFF);
             pc = add;
-//            printf("Jump to address 0x%x", add);
             break;
         }
 
@@ -100,7 +67,6 @@ void Chip8::execute() {
             uint16_t add = (opcode & 0X0FFF);
             stack.push(pc + 2);
             pc = add;
-//            printf("Execute subroutine starting at address 0x%x", add);
             break;
         }
 
@@ -109,7 +75,6 @@ void Chip8::execute() {
             uint8_t x = (opcode & 0X0F00) >> 8;
             uint8_t val = opcode & 0x00FF;
             V[x] == val ? pc += 4 : pc += 2;
-//            printf("Skip the following instruction if the value of register V%x equals 0x%x", r, val);
             break;
         }
 
@@ -117,8 +82,7 @@ void Chip8::execute() {
         case 0x4: {
             uint8_t x = (opcode & 0X0F00) >> 8;
             uint8_t val = (opcode & 0X00FF);
-            V[x] != val ? pc += 4 : pc +=2;
-//            printf("Skip the following instruction if the value of register V%x is not equal to 0x%x", r, val);
+            V[x] != val ? pc += 4 : pc += 2;
             break;
         }
 
@@ -127,7 +91,6 @@ void Chip8::execute() {
             uint8_t x = (opcode & 0x0F00) >> 8;
             uint8_t y = (opcode & 0x00F0) >> 4;
             V[x] == V[y] ? pc += 4 : pc += 2;
-//            printf("Skip the following instruction if the value of register V%x is equal to the value of register V%x", rx, ry);
             break;
         }
 
@@ -137,7 +100,6 @@ void Chip8::execute() {
             uint8_t val = opcode & 0X00FF;
             V[x] = val;
             pc += 2;
-//            printf("Store number 0x%x in register V%x", val, x, V[x]);
             break;
         }
 
@@ -147,7 +109,6 @@ void Chip8::execute() {
             uint8_t val = opcode & 0X00FF;
             V[x] += val;
             pc += 2;
-//            printf("Add the value %x to register V%x", val, r);
             break;
         }
 
@@ -231,10 +192,7 @@ void Chip8::execute() {
                 // Set register VF to the most significant bit prior to the shift
                 // VY is unchanged
                 case 0xE: {
-//                    V[x] = V[y] << 1;
-//                    pc += 2;
-
-                    V[0xF] = (V[x] & 0x80u) >> 7u;
+                    V[0xF] = (V[x] & 0x80) >> 7;
                     V[x] <<= 1;
                     pc += 2;
                     break;
@@ -249,7 +207,6 @@ void Chip8::execute() {
             uint8_t x = (opcode & 0x0F00) >> 8;
             uint8_t y = (opcode & 0x00F0) >> 4;
             V[x] != V[y] ? pc += 4 : pc += 2;
-//            printf("Skip the following instruction if the value of register V%x is not equal to the value of register V%x", rx, ry);
             break;
         }
 
@@ -258,7 +215,6 @@ void Chip8::execute() {
             uint16_t add = opcode & 0X0FFF;
             I = add;
             pc += 2;
-//            printf("Store memory address 0x%x in register I", add);
             break;
         }
 
@@ -266,7 +222,6 @@ void Chip8::execute() {
         case 0xB: {
             uint16_t add = opcode & 0x0FFF;
             pc = add + V[0];
-//            printf("Jump to address 0X%x + V0", add);
             break;
         }
 
@@ -277,39 +232,36 @@ void Chip8::execute() {
             uint8_t val = (std::rand() % 256) & mask;
             V[x] = val;
             pc += 2;
-//            printf("Set V%x to a random number with a mask of 0x%x", rx, val);
             break;
         }
 
         // DXYN - Draw a sprite at position VX, VY with N bytes of sprite data starting at the address stored in I
         // Set VF to 01 if any set pixels are changed to unset, and 00 otherwise
         case 0xD: {
-            uint8_t x = (opcode & 0x0f00) >> 8;
-            uint8_t y = (opcode & 0x00f0) >> 4;
-            uint8_t spriteHeight = opcode & 0x000f;
+            uint8_t x = (opcode & 0x0F00) >> 8;
+            uint8_t y = (opcode & 0x00F0) >> 4;
+            uint8_t spriteHeight = opcode & 0x000F;
             V[0xf] = 0;
 
             for (int i = 0; i < spriteHeight; ++i) {
                 uint8_t spriteByte = memory[I + i];
 
                 for (int j = 0; j < 8; ++j) {
-                    uint8_t spritePixel = spriteByte & (0x80 >> j);
-                    uint32_t* screenPixel = &gfx[(V[y] + i) * GFX_WIDTH + (V[x] + j)];
+                    uint8_t sprite = spriteByte & (0x80 >> j);
+                    uint32_t *pixel = &gfx[(V[y] + i) * GFX_WIDTH + (V[x] + j)];
 
-//                     Sprite pixel is on
-                    if (spritePixel) {
+                    if (sprite) {
                         // Screen pixel also on - collision
-                        if (*screenPixel == 0xffffffff) {
-                            V[0xf] = 1;
+                        if (*pixel) {
+                            V[0xF] = 1;
                         }
-//                         Effectively XOR with the sprite pixel
-                        *screenPixel ^= 0xffffffff;
+
+                        *pixel ^= palette;
                     }
                 }
             }
 
             pc += 2;
-//            printf("Draw sprite");
             break;
         }
 
@@ -319,16 +271,14 @@ void Chip8::execute() {
 
             // EX9E - Skip the following instruction if the key corresponding to the hex value currently stored in register VX is pressed
             if (suffix == 0x9E) {
-//                printf("***************\n");
                 uint8_t key = V[x];
-                keypad[key] == 1 ? pc += 4 : pc += 2;
+                keyboard->IsDown(key) ? pc += 4 : pc += 2;
             }
 
             // EXA1 - Skip the following instruction if the key corresponding to the hex value currently stored in register VX is not pressed
             if (suffix == 0xA1) {
-//                printf("EXA1 [0x%x] - V%x = 0x%x\n", opcode, x, V[x]);
                 uint8_t key = V[x];
-                keypad[key] == 0 ? pc += 4 : pc += 2;
+                keyboard->IsUp(key) ? pc += 4 : pc += 2;
             }
 
             break;
@@ -348,19 +298,12 @@ void Chip8::execute() {
 
                 // FX0A - Wait for a keypress and store the result in register VX
                 case 0x0A: {
-//                    printf("Wait for a keypress and store the result in register V%x\n", x);
-
-                    bool keyPressed = false;
-
-                    for (int i = 0; i < 16; ++i) {
-                        if (keypad[i] == 1) {
+                    for (int i = 0; i < TOTAL_KEYS; ++i) {
+                        if (keyboard->IsDown(i)) {
                             V[x] = uint8_t(i);
-                            keyPressed = true;
+                            pc += 2;
+                            break;
                         }
-                    }
-
-                    if (keyPressed) {
-                        pc += 2;
                     }
 
                     break;
@@ -390,7 +333,7 @@ void Chip8::execute() {
                 // FX29 - Set I to the memory address of the sprite data corresponding to the hexadecimal digit stored in register VX
                 case 0x29: {
                     uint8_t fontAdd = (FONT_SIZE * V[x]) + FONT_SET_START_ADDRESS;
-                    I = (fontAdd & 0x00ff);
+                    I = (fontAdd & 0x00FF);
                     pc += 2;
                     break;
                 }
@@ -423,38 +366,19 @@ void Chip8::execute() {
                     pc += 2;
                     break;
                 }
-
-                default: break;
             }
 
             break;
         }
-        default: printf("Unknown prefix 0x%x", prefix);
-        }
 
-        if (DT > 0) DT--;
-
-//        auto currentTime = std::chrono::high_resolution_clock::now();
-//        auto difference = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - lastTime).count();
-//
-//        printf("Difference %lld \n", difference);
-//
-//        if (difference >= 1 / 60 ) {
-//            lastTime = currentTime;
-//
-//            if (DT > 0) DT--;
-//        }
-
-//    printf("\n");
-}
-
-void Chip8::DebugRam() {
-    for(int i = 0; i < memory.size(); ++i) {
-        printf("0x%x | %d -> ", i, i);
-        printf("%x\n", memory[i]);
+        default:printf("Unknown prefix 0x%x", prefix);
     }
+
+    if (DT > 0) DT--;
+    if (ST > 0) ST--;
 }
 
-void Chip8::clearDisplay() {
+
+void Chip8::ClearGfx() {
     memset(gfx, 0, sizeof(gfx));
 }
