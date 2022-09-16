@@ -22,6 +22,4 @@ You can use one of the roms located in `/rom1` directory.<br>
 
 <img src="./img/brix_screenshot.png" alt="drawing" width="350" style="margin-right: 15px"/> 
 <img src="./img/pong_screenshot.png" alt="drawing" width="350"/>
-<br>
-<br>
 <img src="./img/tetris_screenshot.png" alt="drawing" width="350"/> 
