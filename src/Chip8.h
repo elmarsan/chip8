@@ -1,6 +1,7 @@
 #include "Keyboard.h"
 
 #include <stack>
+#include <cstdint>
 
 #ifndef CHIP8_CHIP8_H
 #define CHIP8_CHIP8_H

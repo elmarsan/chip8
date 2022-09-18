@@ -3,6 +3,8 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <ctime>
+#include <cstring>
 
 const uint32_t colors [4]{
     0xFF000000, // red
@@ -12,7 +14,7 @@ const uint32_t colors [4]{
 };
 
 Chip8::Chip8(Keyboard *k) : keyboard(k) {
-    std::srand(std::time(nullptr));
+    std::srand(time(nullptr));
 
     pc = MEMORY_ROM_START_ADDRESS;
     palette = colors[std::rand() % 4];
