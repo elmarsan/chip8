@@ -1,25 +1,30 @@
-# Chip 8 Emulator 
+# Chip 8 Interpreter (Remake 2024)
 
-This is a complete working implementation of chip8 interpreter written in c++.
-
-## Usage
-
-You can use the binary located in the `/build` directory.
-The binary requires a room file passed by argument.
-
-E.g: `./build/chip8 <path_to_rom>`
-
-You can use one of the roms located in `/rom1` directory.<br>
-> ./build/chip8 ./rom/brix.ch8
-
+This is a remake of my Chip 8 interpreter originally written in 2022. The original version can be found in the `v1_2022` directory.
 ## Build
-1. Create makefile using cmake: `cmake .`
-2. Create build with: `make`
-3. Enjoy it 
 
+### Windows
 
-### Screenshots 
+Requires MSVC and access to `cl.exe`
 
-<img src="./img/brix_screenshot.png" alt="drawing" width="350" style="margin-right: 15px"/> 
-<img src="./img/pong_screenshot.png" alt="drawing" width="350"/>
-<img src="./img/tetris_screenshot.png" alt="drawing" width="350"/> 
+1. Run `build_windows.bat`
+
+### Linux
+
+Depends on X11 window system, Wayland is not supported.
+Requires c++20 compiler (clang >= 17 and gcc >= 13)
+
+1. Execute `build_linux.sh`
+
+### Cmake
+
+You can compile for X11, WIN or SDL platforms.
+
+If you wish to use SDL, you must first get the submodule:
+`git submodule update --init external/SDL`
+
+1. Configure CMake for your target platform
+`cmake -B build -DPLATFORM=<target_platform>`
+
+2. Build the project:
+`cmake --build build`

@@ -1,34 +1,55 @@
-#include "App.h"
+#include <chrono>
+#include <iostream>
+#include <thread>
 
-#include <fstream>
-#include <stdexcept>
+#include "chip8.h"
+#include "platform.h"
 
-int main(int argc, char *argv[]) {
-    if (argc < 2) {
-        throw std::runtime_error("Missing rom file argument");
+constexpr auto execPerTick = 10;
+
+int main(int argc, char* argv[])
+{
+    if (argc < 2)
+    {
+        std::cout << "Missing rom file argument\n";
+        return 1;
     }
 
-    char *rom = argv[1];
-    std::ifstream file(rom, std::ios::binary | std::ios::ate);
-    std::streamsize size = file.tellg();
-
-    if (size < 0) {
-        throw std::runtime_error("Rom file not found");
+    Chip8 chip8;
+    if (!chip8.LoadRom(argv[1]))
+    {
+        return 1;
     }
 
-    char *buffer = new char[size];
+    if (!platform_create_window("Chip8", 800, 600))
+    {
+        return 1;
+    }
 
-    file.seekg(0, std::ios::beg);
-    file.read(buffer, size);
-    file.close();
+    const auto fps = 60;
+    const auto frameDelay = 1000 / fps;
 
-    Keyboard keyboard{};
-    Chip8 chip8(&keyboard);
-    chip8.LoadRom(buffer, int(size));
+    while (true)
+    {
+        auto frameStart = std::chrono::high_resolution_clock::now();
 
-    App app(chip8, &keyboard, 10, 64, 32, 15, rom);
+        for (int i = 0; i < execPerTick; i++)
+        {
+            chip8.ExecuteNext();
+        }
 
-    app.OnExecute();
+        if (!platform_update_window(chip8.videoBuffer))
+        {
+            platform_close_window();
+            return 0;
+        }
 
-    return 0;
+        std::chrono::duration<float, std::milli> frameDuration = std::chrono::high_resolution_clock::now() - frameStart;
+        auto frameTime = frameDuration.count();
+
+        if (frameDelay > frameTime)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(frameDelay - frameTime)));
+        }
+    }
 }
