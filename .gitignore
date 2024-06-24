@@ -2,3 +2,4 @@ build/
 .vs/
 chip8.exe
 chip8
+.cache/

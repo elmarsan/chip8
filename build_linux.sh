@@ -4,6 +4,8 @@ clang++ \
     -std=c++20 \
     -stdlib=libstdc++ \
     -I/usr/include/c++/13 \
-    -I/usr/lib/gcc/x86_64=linux-gnu \
-    main.cpp \
-    -o chip8.exe
+    -I/usr/lib/gcc/x86_64-linux-gnu \
+    $(pkg-config --cflags x11) \
+    main.cpp platform_x11.cpp \
+    -o chip8.exe \
+    $(pkg-config --libs x11)
