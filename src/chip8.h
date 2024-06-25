@@ -9,6 +9,10 @@
 constexpr int chip8Width = 64;
 constexpr int chip8Height = 32;
 
+constexpr int spriteCount = 15;
+constexpr int spriteSize = 5;
+constexpr uint8_t spriteStartAddress = 0x50;
+
 constexpr uint8_t fontset[80] = {
     0xF0, 0x90, 0x90, 0x90, 0xF0,  // 0
     0x20, 0x60, 0x20, 0x20, 0x70,  // 1
@@ -44,6 +48,8 @@ struct Chip8
     uint32_t videoBuffer[chip8Width * chip8Height]{};
 
     std::stack<uint16_t> stack;
+
+    bool input[15];
   
     Chip8();
 
