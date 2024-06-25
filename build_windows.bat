@@ -7,5 +7,5 @@ clang++ ^
     -std=c++20 ^
     -I %MSV_INCLUDE_PATH% ^
     -L %MSV_LIB_PATH% ^
-    .\main.cpp ^
+    .\src\main.cpp .\src\chip8.cpp .\platform_win32.cpp ^
     -o .\chip8.exe

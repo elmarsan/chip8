@@ -2,9 +2,8 @@
 
 #include <cstdint>
 #include <string>
-
-extern uint32_t videoBuff[64 * 32]; 
+#include "chip8.h"
 
 bool CreateWindow(const std::string& title, const int width, const int height);
-bool UpdateWindow();
+bool UpdateWindow(const uint32_t (&buffer)[chip8Width * chip8Height]);
 void CloseWindow();

@@ -11,7 +11,8 @@ Requires clang >= 17 and msv
 
 ### Linux
 
-Requires clang >= 17 and gcc >= 13
+Depends on X11 window system, wayland is not supported.
+Requires c++20 compiler (clang >= 17 and gcc >= 13)
 
 1. Execute `build_linux.sh`
 
