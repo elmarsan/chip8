@@ -7,7 +7,8 @@
 
 Display* display;
 Window window;
-GC context;
+XEvent event;
+GC gc;
 int width;
 int height;
 
@@ -30,13 +31,12 @@ bool CreateWindow(const std::string& title, const int w, const int h)
     XSelectInput(display, window, ExposureMask | KeyPressMask);
     XMapWindow(display, window);
 
-    context = XCreateGC(display, window, 0, NULL);
+    gc = XCreateGC(display, window, 0, NULL);
     return true;
 }
 
 bool UpdateWindow(const uint32_t (&videoBuffer)[chip8Width * chip8Height])
 {
-    XEvent event;
     XNextEvent(display, &event);
 
     // Calculate the scale factors
@@ -51,7 +51,7 @@ bool UpdateWindow(const uint32_t (&videoBuffer)[chip8Width * chip8Height])
         {
             for (int x = 0; x < chip8Width; ++x)
             {
-                XSetForeground(display, context, videoBuffer[y * chip8Width + x]);
+                XSetForeground(display, gc, videoBuffer[y * chip8Width + x]);
 
                 // Calculate the position and size of the rectangle
                 const auto rectX = x * scaleX;
@@ -60,9 +60,10 @@ bool UpdateWindow(const uint32_t (&videoBuffer)[chip8Width * chip8Height])
                 const auto rectHeight = scaleY;
 
                 // Draw a filled rectangle to scale the pixel
-                XFillRectangle(display, window, context, rectX, rectY, rectWidth, rectHeight);
+                XFillRectangle(display, window, gc, rectX, rectY, rectWidth, rectHeight);
             }
         }
+        /* XFreeGC(display, gc); */
     }
 
     // Handle key press event (ESC key)

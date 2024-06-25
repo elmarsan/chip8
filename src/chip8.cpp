@@ -38,7 +38,7 @@ void Chip8::ExecuteNext()
     const auto opcode = U8_CONCAT(hi, lo);
     const auto prefix = (hi & 0xf0) >> 4;
 
-    std::cout << std::format("Executing 0x{:04x}, prefix {}\n", opcode, prefix);
+    /* std::cout << std::format("Executing 0x{:04x}, prefix {}\n", opcode, prefix); */
 
     switch (prefix)
     {
@@ -196,7 +196,6 @@ void Chip8::ExecuteNext()
         // 8XYE
         case 0xe:
         {
-
             regs[15] = READ_BIT(regs[x], 7);
             regs[x] = (regs[x] << 1);
         }
@@ -219,20 +218,20 @@ void Chip8::ExecuteNext()
         return;
     }
     // ANNN
-    case 0xA:
+    case 0xa:
     {
         ri = (opcode & 0xfff);
         pc += 2;
         return;
     }
     // BNNN
-    case 0xB:
+    case 0xb:
     {
         pc = (opcode & 0x0fff) + regs[0];
         return;
     }
     // DXYN
-    case 0xD:
+    case 0xd:
     {
         const auto x = (opcode & 0x0f00) >> 8;
         const auto y = (opcode & 0x00f0) >> 4;
@@ -264,8 +263,31 @@ void Chip8::ExecuteNext()
         pc += 2;
         return;
     }
+    case 0xe:
+    {
+        switch (lo)
+        {
+        // EX9E
+        /* EX9E	Skip the following instruction if the key corresponding to the hex value currently stored in register VX
+         * is pressed */
+        case 0x9e:
+        {
+            break;
+        }
+        // EXA1
+        /* EXA1	Skip the following instruction if the key corresponding to the hex value currently stored in register VX
+         * is not pressed */
+        case 0xa1:
+        {
+            break;
+        }
+        }
 
-    case 0xF:
+        pc += 2;
+        return;
+
+    }
+    case 0xf:
     {
         const auto idx = (opcode & 0x0f00) >> 8;
 
