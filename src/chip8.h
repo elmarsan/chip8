@@ -58,7 +58,4 @@ struct Chip8
 
     void LoadRom(const std::string& path);
     void ExecuteNext();
-
-   private:
-    void updateTimers();
 };
