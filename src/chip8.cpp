@@ -1,13 +1,18 @@
-#include "chip8.h"
 #include <cstring>
 #include <format>
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <random>
+
 #include "bit.h"
+#include "chip8.h"
+#include "input.h"
 
 Chip8::Chip8()
 {
+    std::srand(time(NULL));
+
     // Load fontset
     std::memcpy(&memory[0x50], fontset, sizeof(fontset));
 }
@@ -40,27 +45,40 @@ void Chip8::ExecuteNext()
 
     /* std::cout << std::format("Executing 0x{:04x}, prefix {}\n", opcode, prefix); */
 
+    // Update timers
+    if (rdelay > 0)
+        --rdelay;
+
+    if (rsound > 0)
+    {
+        if (rsound == 1)
+        {
+            std::cout << "BEEP!\n";
+        }
+        --rsound;
+    }
+
     switch (prefix)
     {
     // JUMP NNN
     case 1:
     {
-        pc = (opcode & 0xfff);
+        pc = (opcode & 0x0fff);
         return;
     }
     // CALL NNN
     case 2:
     {
         stack.push(pc + 2);
-        pc = (opcode & 0xfff);
+        pc = (opcode & 0x0fff);
         return;
     }
     // 3XNN
     case 3:
     {
-        const auto idx = (opcode & 0x0f00) >> 8;
-        const auto value = (opcode & 0xff);
-        if (regs[idx] == value)
+        const auto x = (opcode & 0x0f00) >> 8;
+        const auto value = (opcode & 0x00ff);
+        if (regs[x] == value)
         {
             pc += 4;
             return;
@@ -71,8 +89,8 @@ void Chip8::ExecuteNext()
     // 4XNN
     case 4:
     {
-        const auto idx = (opcode & 0x0f00) >> 8;
-        if (regs[idx] != lo)
+        const auto x = (opcode & 0x0f00) >> 8;
+        if (regs[x] != lo)
         {
             pc += 4;
             return;
@@ -96,16 +114,16 @@ void Chip8::ExecuteNext()
     // 6XNN
     case 6:
     {
-        const auto idx = (opcode & 0x0f00) >> 8;
-        regs[idx] = lo;
+        const auto x = (opcode & 0x0f00) >> 8;
+        regs[x] = lo;
         pc += 2;
         return;
     }
     // 7XNN
     case 7:
     {
-        const auto idx = (opcode & 0x0f00) >> 8;
-        regs[idx] += lo;
+        const auto x = (opcode & 0x0f00) >> 8;
+        regs[x] += lo;
         pc += 2;
         return;
     }
@@ -144,60 +162,38 @@ void Chip8::ExecuteNext()
         // 8XY4
         case 4:
         {
-            // carry
-            if (static_cast<uint16_t>(regs[x]) + static_cast<uint16_t>(regs[y]) > 0xff)
-            {
-                regs[15] = 1;
-            }
-            else
-            {
-                regs[15] = 0;
-            }
-            regs[x] += regs[y];
+            uint16_t sum = regs[x] + regs[y];
+            regs[x] = sum & 0xFF;
+            regs[15] = (sum > 0xFF);
             break;
         }
         // 8XY5
         case 5:
         {
-            // borrow
-            if (regs[x] > regs[y])
-            {
-                regs[15] = 1;
-            }
-            else
-            {
-                regs[15] = 0;
-            }
+            regs[15] = !(regs[y] > regs[x]);
             regs[x] -= regs[y];
             break;
         }
         // 8XY6
         case 6:
         {
-            regs[15] = READ_BIT(regs[x], 0);
-            regs[x] = (regs[x] >> 1);
+            regs[x] = (regs[y] >> 1);
+            regs[15] = READ_BIT(regs[y], 0);
             break;
         }
         // 8XY7
         case 7:
         {
-            // borrow
-            if (regs[x] > regs[y])
-            {
-                regs[15] = 1;
-            }
-            else
-            {
-                regs[15] = 0;
-            }
             regs[x] = regs[y] - regs[x];
+            regs[15] = regs[y] > regs[x];
             break;
         }
         // 8XYE
         case 0xe:
         {
-            regs[15] = READ_BIT(regs[x], 7);
-            regs[x] = (regs[x] << 1);
+            regs[x] = (regs[y] << 1);
+            regs[15] = READ_BIT(regs[y], 7);
+            break;
         }
         }
 
@@ -228,6 +224,14 @@ void Chip8::ExecuteNext()
     case 0xb:
     {
         pc = (opcode & 0x0fff) + regs[0];
+        return;
+    }
+    // CXNN
+    case 0xc:
+    {
+        const auto x = (opcode & 0x0f00) >> 8;
+        regs[x] = (rand() % 0xFF) & (opcode & 0x00FF);
+        pc += 2;
         return;
     }
     // DXYN
@@ -265,27 +269,34 @@ void Chip8::ExecuteNext()
     }
     case 0xe:
     {
+        const auto idx = (opcode & 0x0f00) >> 8;
+
         switch (lo)
         {
         // EX9E
-        /* EX9E	Skip the following instruction if the key corresponding to the hex value currently stored in register VX
-         * is pressed */
         case 0x9e:
         {
+            if (IsKeyPressed(regs[idx]))
+            {
+                pc += 4;
+                return;
+            }
             break;
         }
         // EXA1
-        /* EXA1	Skip the following instruction if the key corresponding to the hex value currently stored in register VX
-         * is not pressed */
         case 0xa1:
         {
+            if (!IsKeyPressed(regs[idx]))
+            {
+                pc += 4;
+                return;
+            }
             break;
         }
         }
 
         pc += 2;
         return;
-
     }
     case 0xf:
     {
@@ -302,14 +313,17 @@ void Chip8::ExecuteNext()
         // FX0A
         case 0x0a:
         {
-            for (int i = 0; i < spriteCount; i++)
+            for (int i = 0; i < inputKeyCount; i++)
             {
-                if (input[i])
+                if (IsKeyPressed(i))
                 {
                     regs[idx] = i;
                     break;
                 }
             }
+            // Block until key pressed
+            pc -= 2;
+            return;
         }
         // FX15
         case 0x15:
@@ -376,16 +390,16 @@ void Chip8::ExecuteNext()
     {
         std::memset(videoBuffer, 0, sizeof(videoBuffer));
         pc += 2;
-        break;
+        return;
     }
     case 0x00ee:
     {
         pc = stack.top();
         stack.pop();
-        break;
+        return;
     }
     default:
         std::cout << std::format("UNIMPLEMENTED 0x{:04x}\n", opcode);
         abort();
-    }
+    } 
 }

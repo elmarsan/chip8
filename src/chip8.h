@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <random>
 #include <stack>
 #include <string>
 
@@ -32,6 +33,8 @@ constexpr uint8_t fontset[80] = {
     0xF0, 0x80, 0xF0, 0x80, 0x80   // F
 };
 
+constexpr int inputKeyCount = 15;
+
 struct Chip8
 {
     // General purpose registers
@@ -50,9 +53,12 @@ struct Chip8
     std::stack<uint16_t> stack;
 
     bool input[15];
-  
+
     Chip8();
 
     void LoadRom(const std::string& path);
     void ExecuteNext();
+
+   private:
+    void updateTimers();
 };

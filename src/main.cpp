@@ -1,7 +1,8 @@
-#include <iostream>
-#include <cstring>
 #include <chrono>
+#include <iostream>
+#include <thread>
 
+#include "chip8.h"
 #include "platform.h"
 
 int main(int argc, char* argv[])
@@ -15,33 +16,31 @@ int main(int argc, char* argv[])
     Chip8 chip8;
     chip8.LoadRom(argv[1]);
 
-    CreateWindow("Chip8", 800, 600);
+    if (!CreateWindow("Chip8", 800, 600))
+    {
+        return 1;
+    }
 
-    auto lastFrame = std::chrono::high_resolution_clock::now();
+    const int fps = 60;
+    const int frameDelay = 1000 / fps;
 
     while (true)
     {
-        auto currentFrame = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<float> deltaTime = currentFrame - lastFrame;
-        lastFrame = currentFrame;
-
-        // If 1/60th of a second has passed
-        if (deltaTime.count() >= 1.0f / 60.0f)
-        {
-            if (chip8.rdelay > 0)
-            {
-                --chip8.rdelay;
-            }
-            if (chip8.rsound > 0)
-            {
-                --chip8.rsound;
-            }
-
-            // Reset the last_time to current_time
-            lastFrame = currentFrame;
-        }
+        auto frameStart = std::chrono::high_resolution_clock::now();
 
         chip8.ExecuteNext();
-        UpdateWindow(chip8.videoBuffer);
+        if (!UpdateWindow(chip8.videoBuffer))
+        {
+            CloseWindow();
+            return 1;
+        }
+
+        std::chrono::duration<float, std::milli> frameDuration = std::chrono::high_resolution_clock::now() - frameStart;
+        float frameTime = frameDuration.count();
+
+        if (frameDelay > frameTime)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(frameDelay - frameTime)));
+        }
     }
 }
