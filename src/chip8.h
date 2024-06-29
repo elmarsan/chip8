@@ -56,6 +56,6 @@ struct Chip8
 
     Chip8();
 
-    void LoadRom(const std::string& path);
+    bool LoadRom(const std::string& path);
     void ExecuteNext();
 };

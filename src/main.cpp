@@ -5,6 +5,8 @@
 #include "chip8.h"
 #include "platform.h"
 
+constexpr auto execPerTick = 12;
+
 int main(int argc, char* argv[])
 {
     if (argc < 2)
@@ -14,21 +16,28 @@ int main(int argc, char* argv[])
     }
 
     Chip8 chip8;
-    chip8.LoadRom(argv[1]);
+    if (!chip8.LoadRom(argv[1]))
+    {
+        return 1;
+    }
 
     if (!CreateWindow("Chip8", 800, 600))
     {
         return 1;
     }
 
-    const int fps = 60;
-    const int frameDelay = 1000 / fps;
+    const auto fps = 60;
+    const auto frameDelay = 1000 / fps;
 
     while (true)
     {
         auto frameStart = std::chrono::high_resolution_clock::now();
 
-        chip8.ExecuteNext();
+        for (int i = 0; i < execPerTick; i++)
+        {
+            chip8.ExecuteNext();
+        }
+
         if (!UpdateWindow(chip8.videoBuffer))
         {
             CloseWindow();
@@ -36,7 +45,7 @@ int main(int argc, char* argv[])
         }
 
         std::chrono::duration<float, std::milli> frameDuration = std::chrono::high_resolution_clock::now() - frameStart;
-        float frameTime = frameDuration.count();
+        auto frameTime = frameDuration.count();
 
         if (frameDelay > frameTime)
         {

@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include <cstring>
 #include <format>
 #include <fstream>
@@ -17,12 +18,13 @@ Chip8::Chip8()
     std::memcpy(&memory[0x50], fontset, sizeof(fontset));
 }
 
-void Chip8::LoadRom(const std::string& path)
+bool Chip8::LoadRom(const std::string& path)
 {
     std::fstream fileStream{path, std::ios::binary | std::ios::in};
     if (!fileStream.is_open())
     {
         std::cout << std::format("Failed to open rom: {}\n", path.c_str());
+        return false;
     }
 
     pc = 512;
@@ -34,6 +36,8 @@ void Chip8::LoadRom(const std::string& path)
         memory[memoryOffset + 1] = c[1];
         memoryOffset += 2;
     }
+
+    return true;
 }
 
 void Chip8::ExecuteNext()
@@ -42,36 +46,46 @@ void Chip8::ExecuteNext()
     const auto lo = memory[pc + 1];
     const auto opcode = U8_CONCAT(hi, lo);
     const auto prefix = (hi & 0xf0) >> 4;
-
-    /* std::cout << std::format("Executing 0x{:04x}, prefix {}\n", opcode, prefix); */
-
-    // Update timers
-    if (rdelay > 0)
-        --rdelay;
-
-    if (rsound > 0)
-    {
-        if (rsound == 1)
-        {
-            std::cout << "BEEP!\n";
-        }
-        --rsound;
-    }
-
+    
     switch (prefix)
     {
+    case 0:
+    {
+        const auto suffix = opcode & 0xf;
+
+        switch (suffix)
+        {
+        // 0NNN
+        case 0:
+        {
+            std::memset(videoBuffer, 0, sizeof(videoBuffer));
+            pc += 2;
+            break;
+        }
+
+        // 00EE
+        case 0xe:
+        {
+            pc = stack.top();
+            stack.pop();
+            break;
+        }
+        }
+
+        break;
+    }
     // JUMP NNN
     case 1:
     {
         pc = (opcode & 0x0fff);
-        return;
+        break;
     }
     // CALL NNN
     case 2:
     {
         stack.push(pc + 2);
         pc = (opcode & 0x0fff);
-        return;
+        break;
     }
     // 3XNN
     case 3:
@@ -81,10 +95,10 @@ void Chip8::ExecuteNext()
         if (regs[x] == value)
         {
             pc += 4;
-            return;
+            break;
         }
         pc += 2;
-        return;
+        break;
     }
     // 4XNN
     case 4:
@@ -93,10 +107,10 @@ void Chip8::ExecuteNext()
         if (regs[x] != lo)
         {
             pc += 4;
-            return;
+            break;
         }
         pc += 2;
-        return;
+        break;
     }
     // 5XY0
     case 5:
@@ -106,10 +120,10 @@ void Chip8::ExecuteNext()
         if (regs[x] == regs[y])
         {
             pc += 4;
-            return;
+            break;
         }
         pc += 2;
-        return;
+        break;
     }
     // 6XNN
     case 6:
@@ -117,7 +131,7 @@ void Chip8::ExecuteNext()
         const auto x = (opcode & 0x0f00) >> 8;
         regs[x] = lo;
         pc += 2;
-        return;
+        break;
     }
     // 7XNN
     case 7:
@@ -125,7 +139,7 @@ void Chip8::ExecuteNext()
         const auto x = (opcode & 0x0f00) >> 8;
         regs[x] += lo;
         pc += 2;
-        return;
+        break;
     }
     case 8:
     {
@@ -198,7 +212,7 @@ void Chip8::ExecuteNext()
         }
 
         pc += 2;
-        return;
+        break;
     }
     // 9XY0
     case 9:
@@ -208,23 +222,23 @@ void Chip8::ExecuteNext()
         if (regs[x] != regs[y])
         {
             pc += 4;
-            return;
+            break;
         }
         pc += 2;
-        return;
+        break;
     }
     // ANNN
     case 0xa:
     {
         ri = (opcode & 0xfff);
         pc += 2;
-        return;
+        break;
     }
     // BNNN
     case 0xb:
     {
         pc = (opcode & 0x0fff) + regs[0];
-        return;
+        break;
     }
     // CXNN
     case 0xc:
@@ -232,7 +246,7 @@ void Chip8::ExecuteNext()
         const auto x = (opcode & 0x0f00) >> 8;
         regs[x] = (rand() % 0xFF) & (opcode & 0x00FF);
         pc += 2;
-        return;
+        break;
     }
     // DXYN
     case 0xd:
@@ -265,7 +279,7 @@ void Chip8::ExecuteNext()
         }
 
         pc += 2;
-        return;
+        break;
     }
     case 0xe:
     {
@@ -279,7 +293,10 @@ void Chip8::ExecuteNext()
             if (IsKeyPressed(regs[idx]))
             {
                 pc += 4;
-                return;
+            }
+            else 
+            {
+                pc += 2;
             }
             break;
         }
@@ -289,14 +306,16 @@ void Chip8::ExecuteNext()
             if (!IsKeyPressed(regs[idx]))
             {
                 pc += 4;
-                return;
+            }
+            else 
+            {
+                pc += 2;
             }
             break;
         }
         }
 
-        pc += 2;
-        return;
+        break;
     }
     case 0xf:
     {
@@ -308,6 +327,7 @@ void Chip8::ExecuteNext()
         case 0x07:
         {
             regs[idx] = rdelay;
+            pc += 2;
             break;
         }
         // FX0A
@@ -323,24 +343,27 @@ void Chip8::ExecuteNext()
             }
             // Block until key pressed
             pc -= 2;
-            return;
+            break;
         }
         // FX15
         case 0x15:
         {
             rdelay = regs[idx];
+            pc += 2;
             break;
         }
         // FX18
         case 0x18:
         {
             rsound = regs[idx];
+            pc += 2;
             break;
         }
         // FX1E
         case 0x1e:
         {
             ri += regs[idx];
+            pc += 2;
             break;
         }
         // FX29
@@ -348,6 +371,7 @@ void Chip8::ExecuteNext()
         {
             const auto spriteAdd = (spriteSize * regs[idx]) + spriteStartAddress;
             ri = (spriteAdd & 0x00FF);
+            pc += 2;
             break;
         }
         // FX33
@@ -357,6 +381,7 @@ void Chip8::ExecuteNext()
             memory[ri] = x / 100;
             memory[ri + 1] = (x % 100) / 10;
             memory[ri + 2] = ((x % 100) % 10) / 1;
+            pc += 2;
             break;
         }
         // FX55
@@ -366,6 +391,7 @@ void Chip8::ExecuteNext()
             {
                 memory[ri + i] = regs[i];
             }
+            pc += 2;
             break;
         }
         // FX65
@@ -375,31 +401,30 @@ void Chip8::ExecuteNext()
             {
                 regs[i] = memory[ri + i];
             }
+            pc += 2;
             break;
         }
         }
 
-        pc += 2;
-        return;
-    }
+        break;
     }
 
-    switch (opcode)
-    {
-    case 0x00e0:
-    {
-        std::memset(videoBuffer, 0, sizeof(videoBuffer));
-        pc += 2;
-        return;
-    }
-    case 0x00ee:
-    {
-        pc = stack.top();
-        stack.pop();
-        return;
-    }
     default:
-        std::cout << std::format("UNIMPLEMENTED 0x{:04x}\n", opcode);
+        std::cout << std::format("Unimplementede 0x{:04x}, prefix {}\n", opcode, prefix);
         abort();
-    } 
+    }
+
+    if (rdelay > 0) 
+    {
+        rdelay--;
+    }
+
+    if (rsound > 0)
+    {
+        if(rsound == 1)
+        {
+            std::cout << "BEEP\n";
+        }
+        rsound--;
+    }
 }
