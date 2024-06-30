@@ -21,7 +21,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    if (!CreateWindow("Chip8", 800, 600))
+    if (!platform_create_window("Chip8", 800, 600))
     {
         return 1;
     }
@@ -38,10 +38,10 @@ int main(int argc, char* argv[])
             chip8.ExecuteNext();
         }
 
-        if (!UpdateWindow(chip8.videoBuffer))
+        if (!platform_update_window(chip8.videoBuffer))
         {
-            CloseWindow();
-            return 1;
+            platform_close_window();
+            return 0;
         }
 
         std::chrono::duration<float, std::milli> frameDuration = std::chrono::high_resolution_clock::now() - frameStart;

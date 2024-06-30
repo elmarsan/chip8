@@ -17,7 +17,7 @@ int height;
 // Input handling helper
 int toggleKey(int keysym, bool pressed);
 
-bool CreateWindow(const std::string& title, const int w, const int h)
+bool platform_create_window(const std::string& title, const int w, const int h)
 {
     // Use null to get the default display of the system.
     display = XOpenDisplay(NULL);
@@ -72,7 +72,7 @@ bool CreateWindow(const std::string& title, const int w, const int h)
     return true;
 }
 
-bool UpdateWindow(const uint32_t (&videoBuffer)[chip8Width * chip8Height])
+bool platform_update_window(const uint32_t (&videoBuffer)[chip8Width * chip8Height])
 {
     if (XPending(display))
     {
@@ -125,7 +125,7 @@ bool UpdateWindow(const uint32_t (&videoBuffer)[chip8Width * chip8Height])
     return true;
 }
 
-void CloseWindow()
+void platform_close_window()
 {
     XDestroyWindow(display, window);
     XCloseDisplay(display);

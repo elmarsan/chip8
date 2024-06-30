@@ -1,11 +1,18 @@
 @echo off
 
-set MSV_INCLUDE_PATH="C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.40.33807\include"
-set MSV_LIB_PATH="C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.40.33807\include"
+if not exist ".\build" (
+    mkdir ".\build"
+)
+cd .\build
 
-clang++ ^
-    -std=c++20 ^
-    -I %MSV_INCLUDE_PATH% ^
-    -L %MSV_LIB_PATH% ^
-    .\src\main.cpp .\src\chip8.cpp .\platform_win32.cpp .src\input.cpp ^
-    -o .\chip8.exe
+cl ^
+    /Zi ^
+    /std:c++20 ^
+    /EHsc ^
+    ..\src\chip8.cpp ^
+    ..\src\input.cpp ^
+    ..\src\platform_win32.cpp ^
+    ..\src\main.cpp ^
+    /link user32.lib gdi32.lib
+
+cd ..

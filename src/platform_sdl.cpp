@@ -15,7 +15,7 @@ int height;
 // Input handling helper
 int toggleKey(int scancode, bool pressed);
 
-bool CreateWindow(const std::string& title, const int w, const int h)
+bool platform_create_window(const std::string& title, const int w, const int h)
 {
     window = SDL_CreateWindow("Chip8 SDL", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, w, h, SDL_WINDOW_SHOWN);
     if (window == nullptr)
@@ -37,7 +37,7 @@ bool CreateWindow(const std::string& title, const int w, const int h)
     return true;
 }
 
-bool UpdateWindow(const uint32_t (&videoBuffer)[chip8Width * chip8Height])
+bool platform_update_window(const uint32_t (&videoBuffer)[chip8Width * chip8Height])
 {
     SDL_Event event;
     while (SDL_PollEvent(&event))
@@ -94,7 +94,7 @@ bool UpdateWindow(const uint32_t (&videoBuffer)[chip8Width * chip8Height])
     return true;
 }
 
-void CloseWindow()
+void platform_close_window()
 {
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
