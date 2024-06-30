@@ -1,14 +1,18 @@
 #include <windows.h>
-#include <winuser.h>
 
 #include <cstdint>
-#include <cstdint>
+#include <chrono>
 #include <format>
+#include <string>
+#include <thread>
 
 #include "chip8.h"
-#include "platform.h"
 
-HWND window;
+int width = 800;
+int height = 600;
+
+Chip8 chip8{};
+constexpr auto execPerTick = 12;
 
 // Helper for handling errors of window api
 void handleError(const std::string& msg);
@@ -30,19 +34,35 @@ LRESULT CALLBACK WndProc(HWND window,    // handle to window
         OutputDebugString("WM_PAINT\n");
         PAINTSTRUCT paint;
 
+        OutputDebugString(std::format("Address of chip8: {}\n", static_cast<void*>(&chip8)).c_str());
+
         HDC deviceContext = BeginPaint(window, &paint);
         {
-            RECT rect;
-            rect.left = 0;
-            rect.top = 0;
-            rect.right = 100;
-            rect.bottom = 100;
+            const auto xScale = width / chip8Width;
+            const auto yScale = height / chip8Height;
 
-            HBRUSH greenBrush = CreateSolidBrush(RGB(0, 255, 0));  // RGB(0, 255, 0) is green
-            FillRect(deviceContext, &rect, greenBrush);
-            DeleteObject(greenBrush);
-        } EndPaint(window, &paint);
+            for (int y = 0; y < chip8Height; y++)
+            {
+                for (int x = 0; x < chip8Width; x++)
+                {
+                    const auto pixelColor = chip8.videoBuffer[y * chip8Width + x];
+                    RECT rect;
+                    rect.left = x * xScale;
+                    rect.top = y * yScale;
+                    rect.right = rect.left + xScale;
+                    rect.bottom = rect.top + yScale;
 
+                    const auto r = (pixelColor >> 16) & 0xff;
+                    const auto g = (pixelColor >> 8) & 0xff;
+                    const auto b = pixelColor & 0xff;
+                    HBRUSH brush = CreateSolidBrush(RGB(r, g, b));
+
+                    FillRect(deviceContext, &rect, brush);
+                    DeleteObject(brush);
+                }
+            }
+        }
+        EndPaint(window, &paint);
         return 0;
     }
     case WM_SIZE:
@@ -66,72 +86,103 @@ LRESULT CALLBACK WndProc(HWND window,    // handle to window
     }
 }
 
-bool platform_create_window(const std::string& title, const int width, const int height)
+int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
 {
-    HMODULE hInstance = GetModuleHandle(0);
-    if (!hInstance)
+    OutputDebugString(std::format("Address of chip8: {}\n", static_cast<void*>(&chip8)).c_str());
+    int numArgs;
+    LPWSTR* args = CommandLineToArgvW(GetCommandLineW(), &numArgs);
+    if (args == nullptr)
     {
-        handleError("Unable to GetModuleHandle");
-        return false;
+        MessageBox(NULL, "Missing program arguments", "Error", MB_OK);
+        return 1;
     }
+
+    if (numArgs < 2)
+    {
+        MessageBox(NULL, "Missing rom file argument", "Error", MB_OK);
+        return 1;
+    }
+
+    std::wstring romPathArg = args[1];
+    std::string romPath(romPathArg.begin(), romPathArg.end());
+    OutputDebugStringA(romPath.c_str());
+
+    if (!chip8.LoadRom(romPath))
+    {
+        std::string errMsg = std::format("Rom {} not found\n", romPath);
+        MessageBox(NULL, errMsg.c_str(), "Error", MB_OK);
+        return 1;
+    }
+    LocalFree(args);
 
     WNDCLASSA wndClass = {};
     wndClass.style = CS_OWNDC | CS_SAVEBITS | CS_DROPSHADOW | CS_HREDRAW | CS_VREDRAW;
     wndClass.lpfnWndProc = WndProc;
     wndClass.hInstance = hInstance;
-    wndClass.lpszClassName = title.c_str();
+    wndClass.lpszClassName = "Chip8 windows";
 
     if (!RegisterClassA(&wndClass))
     {
         handleError("Unable to RegisterClassA");
-        return false;
+        return 1;
     }
 
-    DWORD style = WS_VISIBLE | WS_BORDER | WS_TILEDWINDOW;
-
-    window = CreateWindowA(wndClass.lpszClassName,  // lpClassName,
-                           wndClass.lpszClassName,  // lpWindowName,
-                           style,                   // dwStyle,
-                           CW_USEDEFAULT,           // x,
-                           CW_USEDEFAULT,           // y,
-                           width,                   // nWidth,
-                           height,                  // nHeight,
-                           0,                       // hWndParent,
-                           0,                       // hMenu,
-                           hInstance,               // hInstance,
-                           0                        // lpParam
+    HWND window = CreateWindowA(wndClass.lpszClassName,                   // lpClassName,
+                                wndClass.lpszClassName,                   // lpWindowName,
+                                WS_VISIBLE | WS_BORDER | WS_TILEDWINDOW,  // dwStyle,
+                                CW_USEDEFAULT,                            // x,
+                                CW_USEDEFAULT,                            // y,
+                                width,                                    // nWidth,
+                                height,                                   // nHeight,
+                                0,                                        // hWndParent,
+                                0,                                        // hMenu,
+                                hInstance,                                // hInstance,
+                                0                                         // lpParam
     );
-
     if (!window)
     {
         handleError("Unable to CreateWindowA");
-        return false;
+        return 1;
     }
-
-    return true;
-}
-
-bool platform_update_window(const uint32_t (&videoBuffer)[chip8Width * chip8Height])
-{
-    /* if (!UpdateWindow(window)) */
-    /* { */
-    /*     return false; */
-    /* } */
 
     MSG msg;
-    BOOL messageResult = GetMessage(&msg, 0, 0, 0);
-    if (messageResult <= 0)
+
+    const auto fps = 60;
+    const auto frameDelay = 1000 / fps;
+
+    do
     {
-        return true;
-    }
+        if (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
+        {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+        else
+        {
+            auto frameStart = std::chrono::high_resolution_clock::now();
 
-    TranslateMessage(&msg);
-    DispatchMessage(&msg);
+            for (int i = 0; i < execPerTick; i++)
+            {
+                chip8.ExecuteNext();
+            }
 
-    return true;
+            InvalidateRect(window, NULL, true);
+
+            std::chrono::duration<float, std::milli> frameDuration =
+                std::chrono::high_resolution_clock::now() - frameStart;
+            auto frameTime = frameDuration.count();
+
+            if (frameDelay > frameTime)
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(frameDelay - frameTime)));
+            }
+        }
+    } while (msg.message != WM_QUIT);
+
+    DestroyWindow(window);
+
+    return 0;
 }
-
-void platform_close_window() { return; }
 
 void handleError(const std::string& prefix)
 {

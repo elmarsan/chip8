@@ -12,7 +12,6 @@ cl ^
     ..\src\chip8.cpp ^
     ..\src\input.cpp ^
     ..\src\platform_win32.cpp ^
-    ..\src\main.cpp ^
-    /link user32.lib gdi32.lib
+    /link user32.lib gdi32.lib shell32.lib
 
 cd ..
