@@ -5,7 +5,7 @@
 #include "chip8.h"
 #include "platform.h"
 
-constexpr auto execPerTick = 12;
+constexpr auto execPerTick = 10;
 
 int main(int argc, char* argv[])
 {

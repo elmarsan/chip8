@@ -1,4 +1,3 @@
-#include <cstdlib>
 #include <cstring>
 #include <format>
 #include <fstream>
@@ -28,15 +27,9 @@ bool Chip8::LoadRom(const std::string& path)
     }
 
     pc = 512;
-    char c[2];
-    int memoryOffset = 512;
-    while (fileStream.readsome(c, 2))
-    {
-        memory[memoryOffset] = c[0];
-        memory[memoryOffset + 1] = c[1];
-        memoryOffset += 2;
-    }
+    int offset = 512;
 
+    while(fileStream.read(reinterpret_cast<char*>(&memory[offset++]), 1)) {}
     return true;
 }
 
@@ -46,7 +39,9 @@ void Chip8::ExecuteNext()
     const auto lo = memory[pc + 1];
     const auto opcode = U8_CONCAT(hi, lo);
     const auto prefix = (hi & 0xf0) >> 4;
-    
+   
+    /* std::cout << std::format("OPCODE: 0x{:04x}\n", opcode); */
+
     switch (prefix)
     {
     case 0:
@@ -410,7 +405,7 @@ void Chip8::ExecuteNext()
     }
 
     default:
-        std::cout << std::format("Unimplementede 0x{:04x}, prefix {}\n", opcode, prefix);
+        std::cout << std::format("Unimplemented 0x{:04x}, prefix {}\n", opcode, prefix);
         abort();
     }
 
@@ -423,7 +418,7 @@ void Chip8::ExecuteNext()
     {
         if(rsound == 1)
         {
-            std::cout << "BEEP\n";
+            // TODO: Play sound
         }
         rsound--;
     }
